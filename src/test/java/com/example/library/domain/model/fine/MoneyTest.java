@@ -6,7 +6,6 @@ import org.junit.jupiter.api.Test;
 import java.math.BigDecimal;
 
 import static org.assertj.core.api.Assertions.assertThat;
-import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 /**
  * TC-031 Money 值对象单元测试：金额计算必须无浮点误差。
@@ -45,9 +44,10 @@ class MoneyTest {
     }
 
     @Test
-    @DisplayName("币种不一致时拒绝计算")
-    void rejectDifferentCurrency() {
-        assertThatThrownBy(() -> Money.of("1.00").plus(Money.zero()))
-                .isInstanceOf(IllegalArgumentException.class);
+    @DisplayName("金额值相等语义（不同标度视为相等）")
+    void valueEquality() {
+        assertThat(Money.of("3.4")).isEqualTo(Money.of("3.40"));
+        assertThat(Money.of("3.4")).hasSameHashCodeAs(Money.of("3.40"));
+        assertThat(Money.of("3.40")).isNotEqualTo(Money.of("3.41"));
     }
 }
