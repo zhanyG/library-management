@@ -1,0 +1,77 @@
+﻿@startuml
+title 图书管理系统用例模型
+
+left to right direction
+skinparam packageStyle rectangle
+
+actor "读者\nReader" as Reader
+actor "学生读者\nStudentReader" as Student
+actor "教师读者\nTeacherReader" as Teacher
+actor "图书管理员\nLibrarian" as Librarian
+actor "系统管理员\nSystemAdmin" as SystemAdmin
+
+Reader <|-- Student
+Reader <|-- Teacher
+
+rectangle "图书管理系统" {
+  usecase "注册账号" as UC_Register
+  usecase "查询图书" as UC_QueryBook
+  usecase "查询借阅信息" as UC_QueryLoan
+  usecase "预约图书" as UC_Reserve
+  usecase "取消预约" as UC_CancelReserve
+
+  usecase "办理借书" as UC_Borrow
+  usecase "办理还书" as UC_Return
+  usecase "查询读者借阅信息" as UC_QueryReaderLoan
+
+  usecase "办理借阅证" as UC_IssueCard
+  usecase "删除借阅证" as UC_RevokeCard
+  usecase "添加图书管理员" as UC_AddLibrarian
+  usecase "删除图书管理员" as UC_DelLibrarian
+  usecase "添加图书标题信息" as UC_AddTitle
+  usecase "删除图书标题信息" as UC_DelTitle
+  usecase "添加馆藏副本" as UC_AddItem
+  usecase "删除馆藏副本" as UC_DelItem
+  usecase "维护借阅规则和罚款规则" as UC_MaintainPolicy
+
+  usecase "验证借阅证" as UC_ValidateCard
+  usecase "检查借阅规则" as UC_CheckPolicy
+  usecase "验证本馆藏书" as UC_ValidateItem
+  usecase "计算超期罚款" as UC_CalcFine
+}
+
+Reader --> UC_Register
+Reader --> UC_QueryBook
+Reader --> UC_QueryLoan
+Reader --> UC_Reserve
+Reader --> UC_CancelReserve
+
+Librarian --> UC_Borrow
+Librarian --> UC_Return
+Librarian --> UC_QueryReaderLoan
+Librarian --> UC_QueryBook
+
+SystemAdmin --> UC_IssueCard
+SystemAdmin --> UC_RevokeCard
+SystemAdmin --> UC_AddLibrarian
+SystemAdmin --> UC_DelLibrarian
+SystemAdmin --> UC_AddTitle
+SystemAdmin --> UC_DelTitle
+SystemAdmin --> UC_AddItem
+SystemAdmin --> UC_DelItem
+SystemAdmin --> UC_MaintainPolicy
+
+UC_Borrow ..> UC_ValidateCard : <<include>>
+UC_Borrow ..> UC_CheckPolicy : <<include>>
+UC_Return ..> UC_ValidateItem : <<include>>
+UC_Return ..> UC_ValidateCard : <<include>>
+UC_Return ..> UC_CalcFine : <<extend>>
+
+UC_Reserve ..> UC_QueryBook : <<include>>
+UC_CancelReserve ..> UC_QueryLoan : <<include>>
+UC_QueryReaderLoan ..> UC_ValidateCard : <<include>>
+
+UC_IssueCard ..> UC_Register : <<extend>>
+UC_AddItem ..> UC_AddTitle : <<extend>>
+
+@enduml
