@@ -122,7 +122,7 @@
 - 使用任务：REST 端到端测试、README、AI 使用记录
 - 输入 Prompt 摘要：对照 `15-test-plan.md` 覆盖矩阵补充端到端测试（状态码、错误码、权限矩阵），生成 README 并追加实验二 AI 使用记录
 - Agent 修改文件：`src/test/java/.../presentation/ApiEndToEndTest.java`、`README.md`、`specs/19-ai-usage-log.md`
-- 测试结果：`mvn test` 全部通过（96 个测试，0 失败）
+- 测试结果：`mvn test` 全部通过（16 个测试类、105 个测试用例，0 失败）
 - 人工审查结果：确认 README 描述与实现一致、未编造未实现功能；确认 baseline 后仅追加记录类文件（`19-ai-usage-log.md`），未修改已冻结的设计规格
 - Git 提交：`complete test coverage and README`、`chore: finalize experiment 2 execution log`
 
