@@ -114,10 +114,12 @@ def check_puml(errors):
         alt_count = len(re.findall(r"^\s*alt\s", text, re.M))
         else_count = len(re.findall(r"^\s*else\s", text, re.M))
         end_count = len(re.findall(r"^\s*end\s*$", text, re.M))
+        # alt / opt / loop / group 均需要 end 收尾
+        block_count = len(re.findall(r"^\s*(?:alt|opt|loop|group)\s", text, re.M))
         if alt_count == 0:
             problems.append("缺少 alt 分支")
-        if alt_count != end_count:
-            problems.append(f"alt({alt_count}) 与 end({end_count}) 数量不匹配")
+        if block_count != end_count:
+            problems.append(f"分支块({block_count}) 与 end({end_count}) 数量不匹配")
         if problems:
             print(f"[FAIL] specs/{name}: " + "; ".join(problems))
             errors.append(f"puml:{name}")
