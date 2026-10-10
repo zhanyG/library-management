@@ -1,0 +1,176 @@
+@startuml
+title 顺序图：办理借书（UC-101 / FR-011）
+
+autonumber
+
+actor "图书管理员\nLibrarian" as Librarian
+participant "CirculationController" as Ctrl
+participant "CirculationAppService" as App
+participant "CirculationService" as Domain
+participant "BorrowCardRepository" as CardRepo
+participant "FineRecordRepository" as FineRepo
+participant "LoanRepository" as LoanRepo
+participant "ReaderRepository" as ReaderRepo
+participant "BorrowPolicyRepository" as PolicyRepo
+participant "LibraryItemRepository" as ItemRepo
+participant "ReservationRepository" as ResvRepo
+participant "BorrowPolicy" as Policy
+participant "LibraryItem" as Item
+participant "Loan" as Loan
+
+Librarian -> Ctrl : POST /api/circulation/borrow\n{cardNo, barcode, operatorId, operatorRole}
+activate Ctrl
+Ctrl -> Ctrl : 参数校验（@Valid）
+Ctrl -> App : borrowBook(command)
+activate App
+App -> App : assertRole(operatorRole == LIBRARIAN)
+
+alt 操作人不是图书管理员
+  App --> Ctrl : PermissionDeniedException(PERMISSION_DENIED)
+  Ctrl --> Librarian : 403 PERMISSION_DENIED
+else 操作人合法
+  App -> Domain : borrowBook(cardNo, barcode, librarianId, today)
+  activate Domain
+
+  Domain -> CardRepo : findByCardNo(cardNo)
+  activate CardRepo
+  CardRepo --> Domain : Optional<BorrowCard>
+  deactivate CardRepo
+
+  alt 借阅证不存在或已注销/挂失（BR-002）
+    Domain --> App : CardInvalidException(CARD_INVALID)
+    App --> Ctrl : 业务异常
+    Ctrl --> Librarian : 400 CARD_INVALID
+  else 借阅证有效
+    Domain -> FineRepo : existsByReaderIdAndStatus(readerId, UNPAID)
+    activate FineRepo
+    FineRepo --> Domain : boolean
+    deactivate FineRepo
+
+    alt 存在未缴罚款（BR-005）
+      Domain --> App : UnpaidFineExistsException(READER_HAS_UNPAID_FINE)
+      App --> Ctrl : 业务异常
+      Ctrl --> Librarian : 400 READER_HAS_UNPAID_FINE
+    else 无未缴罚款
+      Domain -> LoanRepo : existsOverdueByReaderId(readerId, today)
+      activate LoanRepo
+      LoanRepo --> Domain : boolean
+      deactivate LoanRepo
+
+      alt 存在超期未还图书（BR-004）
+        Domain --> App : OverdueLoanExistsException(READER_HAS_OVERDUE_LOAN)
+        App --> Ctrl : 业务异常
+        Ctrl --> Librarian : 400 READER_HAS_OVERDUE_LOAN
+      else 无超期未还
+        Domain -> ReaderRepo : findById(readerId)
+        activate ReaderRepo
+        ReaderRepo --> Domain : Reader
+        deactivate ReaderRepo
+
+        Domain -> PolicyRepo : findByReaderType(reader.readerType)
+        activate PolicyRepo
+        PolicyRepo --> Domain : BorrowPolicy
+        deactivate PolicyRepo
+
+        Domain -> LoanRepo : countActiveByReaderId(readerId)
+        activate LoanRepo
+        LoanRepo --> Domain : int currentLoanCount
+        deactivate LoanRepo
+
+        Domain -> Policy : exceedQuota(currentLoanCount)
+        activate Policy
+        Policy --> Domain : boolean
+        deactivate Policy
+
+        alt 超过借阅数量上限（BR-003）
+          Domain --> App : QuotaExceededException(QUOTA_EXCEEDED)
+          App --> Ctrl : 业务异常
+          Ctrl --> Librarian : 400 QUOTA_EXCEEDED
+        else 未超过上限
+          Domain -> ItemRepo : findByBarcode(barcode)
+          activate ItemRepo
+          ItemRepo --> Domain : Optional<LibraryItem>
+          deactivate ItemRepo
+
+          alt 非本馆藏书
+            Domain --> App : ItemNotFoundException(ITEM_NOT_AVAILABLE)
+            App --> Ctrl : 业务异常
+            Ctrl --> Librarian : 400 ITEM_NOT_AVAILABLE
+          else 馆藏存在
+            Domain -> Item : isAvailable() && isLoanable()
+            activate Item
+            Item --> Domain : boolean
+            deactivate Item
+
+            alt 副本不可借或论文类不可外借（BR-006）
+              Domain --> App : ItemNotAvailableException(ITEM_NOT_AVAILABLE)\n或 ItemNotLoanableException(ITEM_NOT_LOANABLE)
+              App --> Ctrl : 业务异常
+              Ctrl --> Librarian : 400 ITEM_NOT_AVAILABLE / ITEM_NOT_LOANABLE
+            else 副本可借
+              Domain -> ResvRepo : findHeadWaitingByTitleId(titleId)
+              activate ResvRepo
+              ResvRepo --> Domain : Optional<Reservation>
+              deactivate ResvRepo
+
+              alt 存在他人优先预约（BR-011）
+                Domain --> App : ItemReservedByOtherException(ITEM_RESERVED_BY_OTHER)
+                App --> Ctrl : 业务异常
+                Ctrl --> Librarian : 400 ITEM_RESERVED_BY_OTHER
+              else 无预约占用或本人为队首
+                Domain -> Policy : calcDueDate(today)
+                activate Policy
+                Policy --> Domain : dueDate
+                deactivate Policy
+
+                Domain -> Loan : create(readerId, cardId, itemId, librarianId, today, dueDate)
+                activate Loan
+                Loan --> Domain : Loan(status = BORROWED)
+                deactivate Loan
+
+                Domain -> LoanRepo : save(loan)
+                activate LoanRepo
+                LoanRepo --> Domain : Loan(loanId)
+                deactivate LoanRepo
+
+                Domain -> Item : markOnLoan()
+                activate Item
+                deactivate Item
+                Domain -> ItemRepo : save(item)
+                activate ItemRepo
+                deactivate ItemRepo
+
+                opt 借阅人正是该题名队首预约者
+                  Domain -> ResvRepo : markFulfilled(reservationId)
+                  activate ResvRepo
+                  deactivate ResvRepo
+                end
+
+                Domain --> App : Loan
+              end
+            end
+          end
+        end
+      end
+    end
+  end
+  deactivate Domain
+
+  App -> App : 组装 LoanResponse
+  App --> Ctrl : LoanResponse
+  deactivate App
+  Ctrl --> Librarian : 200 OK {loanId, titleName, borrowDate, dueDate, status}
+  deactivate Ctrl
+end
+
+note over Domain
+  校验链（Template Method，顺序固定，规则来自 BorrowPolicy）：
+  1 借阅证有效 → 2 无未缴罚款 → 3 无超期未还
+  → 4 未超额度 → 5 副本可借 → 6 未被他人预约
+end note
+
+note over App
+  事务边界：borrowBook 方法级 @Transactional
+  创建 Loan + 更新 LibraryItem + 更新 Reservation 同事务提交
+end note
+
+@enduml
