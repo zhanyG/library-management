@@ -1,5 +1,7 @@
 package com.example.library.domain.repository;
 import com.example.library.domain.model.reservation.Reservation;
+import com.example.library.domain.model.reservation.ReservationStatus;
+import java.util.List;
 import java.util.Optional;
 
 /**
@@ -15,4 +17,6 @@ public interface ReservationRepository {
     long countWaitingByReader(Long readerId);
     long countWaitingByTitle(Long titleId);
     Optional<Reservation> findHeadWaitingByTitleId(Long titleId);
+
+    List<Reservation> findByStatus(ReservationStatus status);
 }

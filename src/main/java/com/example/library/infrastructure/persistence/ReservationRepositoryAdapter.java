@@ -3,6 +3,7 @@ package com.example.library.infrastructure.persistence;
 import com.example.library.domain.model.reservation.Reservation;
 import com.example.library.domain.model.reservation.ReservationStatus;
 import com.example.library.domain.repository.ReservationRepository;
+import java.util.List;
 import java.util.Optional;
 import org.springframework.stereotype.Component;
 
@@ -46,5 +47,10 @@ public class ReservationRepositoryAdapter implements ReservationRepository {
     @Override
     public Optional<Reservation> findHeadWaitingByTitleId(Long titleId) {
         return jpa.findFirstByTitleIdAndStatusOrderByQueuePositionAsc(titleId, ReservationStatus.WAITING);
+    }
+
+    @Override
+    public List<Reservation> findByStatus(ReservationStatus status) {
+        return jpa.findByStatus(status);
     }
 }
