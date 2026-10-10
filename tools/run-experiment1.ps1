@@ -127,6 +127,7 @@ if ([string]::IsNullOrWhiteSpace($gitUser)) {
 }
 
 Invoke-Commit -Id '02-3' -Title 'initial commit: project skeleton and empty specs' -Files 'specs tools' -Message 'init AI-era library management experiment'
+Invoke-Step -Id '02-4' -Title 'rename default branch to main' -Command 'git branch -M main'
 
 # ---------- 阶段 3：按实验步骤提交 Specs ----------
 Write-Log '########## Phase 3: commit specs step by step ##########'
