@@ -64,9 +64,8 @@ public class TestDataFactory {
 
     public LibraryItem addItem(BookTitle title, ItemType itemType) {
         LibraryItem item = LibraryItemFactory.create(itemType, nextBarcode(), "A区1排");
-        title.addItem(item);
-        bookTitleRepository.save(title);
-        return item;
+        item.attachTo(title);
+        return libraryItemRepository.save(item);
     }
 
     public Loan createLoan(BorrowCard card, LibraryItem item, LocalDate borrowDate, LocalDate dueDate) {
