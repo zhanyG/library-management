@@ -452,3 +452,23 @@ PS> git rev-list --count HEAD
 ================================================================
 [2026-10-10 11:03:23] STEP 05-4 | commit final execution log
 PS> git add experiment1-run.log
+(no output)
+[exit=0]
+
+[2026-10-10 11:03:23] STEP 05-4-commit | commit: chore: finalize experiment 1 execution log
+PS> git commit -m "chore: finalize experiment 1 execution log"
+[master 9b64834] chore: finalize experiment 1 execution log
+ 1 file changed, 68 insertions(+)
+[exit=0]
+
+[2026-10-10 11:03:23] STEP 05-5 | create baseline tag on final commit
+PS> git tag -f experiment1-specs-baseline-v1
+(no output)
+[exit=0]
+
+[2026-10-10 11:03:23] STEP 05-6 | git tag list
+PS> git tag
+experiment1-specs-baseline-v1
+[exit=0]
+
+NOTE: the next commit and tag are applied silently so that the log itself stays committed.
