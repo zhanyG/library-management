@@ -1,0 +1,146 @@
+﻿@startuml
+title 图书管理系统包图（分层架构 + 模块划分）
+
+skinparam packageStyle rectangle
+skinparam linetype ortho
+
+package "presentation" {
+  package "controller" {
+    class ReaderController
+    class CardController
+    class CatalogController
+    class CirculationController
+    class ReservationController
+    class FineController
+    class AdminController
+  }
+  package "dto" {
+    class BorrowRequest
+    class ReturnRequest
+    class LoanResponse
+    class ReservationResponse
+    class FineResponse
+    class ApiResponse
+  }
+}
+
+package "application" {
+  package "reader" {
+    class ReaderAppService
+  }
+  package "card" {
+    class CardAppService
+  }
+  package "catalog" {
+    class CatalogAppService
+  }
+  package "circulation" {
+    class CirculationAppService
+  }
+  package "reservation" {
+    class ReservationAppService
+  }
+  package "fine" {
+    class FineAppService
+  }
+  package "admin" {
+    class AdminAppService
+  }
+}
+
+package "domain" {
+  package "model.reader" {
+    class Reader
+    class StudentReader
+    class TeacherReader
+    class BorrowCard
+  }
+  package "model.catalog" {
+    class BookTitle
+    class LibraryItem
+    class Book
+    class Magazine
+    class Thesis
+  }
+  package "model.circulation" {
+    class Loan
+  }
+  package "model.reservation" {
+    class Reservation
+  }
+  package "model.fine" {
+    class FineRule
+    class FineRecord
+    class Money
+  }
+  package "model.admin" {
+    class Librarian
+    class SystemAdmin
+    class BorrowPolicy
+  }
+  package "service" {
+    class CirculationService
+    class ReservationService
+    class FineCalculator
+  }
+  package "repository" {
+    interface ReaderRepository
+    interface LoanRepository
+    interface ItemRepository
+    interface ReservationRepository
+    interface PolicyRepository
+  }
+}
+
+package "infrastructure" {
+  package "persistence" {
+    class JpaReaderRepository
+    class JpaLoanRepository
+    class JpaItemRepository
+    class JpaReservationRepository
+    class JpaPolicyRepository
+  }
+  package "support" {
+    class SequenceGenerator
+    class TransactionManager
+    class PersistenceConfig
+  }
+}
+
+package "test" {
+  class DomainUnitTest
+  class ServiceIntegrationTest
+  class ApiEndToEndTest
+}
+
+'================ 层间依赖 =================
+controller ..> dto : 使用
+controller ..> application : 调用应用服务
+
+application ..> domain.model : 编排领域对象
+application ..> domain.service : 调用领域服务
+application ..> domain.repository : 通过接口持久化
+application ..> dto : 转换
+
+domain.service ..> domain.model : 操作
+domain.service ..> domain.repository : 依赖接口
+domain.model <.. domain.repository : 持久化
+
+infrastructure.persistence ..> domain.repository : 实现接口
+infrastructure.support ..> infrastructure.persistence : 支撑
+
+test ..> domain : 单元测试
+test ..> application : 集成测试
+test ..> presentation : API 测试
+
+note right of controller
+  Controller 只依赖 Application Service，
+  禁止直接依赖 Repository
+end note
+
+note bottom of infrastructure.persistence
+  Infrastructure 实现 Domain 定义的
+  Repository 接口（依赖倒置）
+end note
+
+@enduml
