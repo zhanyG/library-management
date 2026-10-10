@@ -264,6 +264,40 @@
 - 步骤：`queuePosition=1` 判定队首；`expireAt` 已过调用 `expire(now)`
 - 预期结果：`isHeadOfQueue()=true`；状态变为 `EXPIRED`
 
+### 2.10 人工审查补充用例
+
+#### TC-047 注销借阅证成功与失败（集成）
+
+- 目标：验证 FR-003
+- 步骤：
+  1. 对无未还借阅的借阅证调用 `DELETE /api/admin/borrow-cards/{cardNo}`，header `X-Operator-Role: SYSTEM_ADMIN`
+  2. 对存在未还借阅的借阅证重复调用
+- 预期结果：
+  1. HTTP `200`，借阅证状态为 `REVOKED`，历史借阅记录仍可查询
+  2. HTTP `409`，`code=CARD_HAS_ACTIVE_LOANS`
+
+#### TC-048 题名下有在借副本时删除失败（集成）
+
+- 目标：验证 FR-007
+- 步骤：题名下存在状态为 `ON_LOAN` 的副本，调用 `DELETE /api/admin/book-titles/{titleId}`
+- 预期结果：HTTP `409`，`code=TITLE_HAS_ACTIVE_LOANS`；题名与副本均未删除
+
+#### TC-049 取消预约成功与越权失败（集成）
+
+- 目标：验证 UC-005 与 BR-015
+- 步骤：
+  1. 预约所属读者本人调用 `DELETE /api/reservations/{id}`
+  2. 其他读者调用同一接口
+- 预期结果：
+  1. HTTP `200`，状态 `CANCELLED`，其他预约的 `queuePosition` 不变
+  2. HTTP `403`，`code=PERMISSION_DENIED`
+
+#### TC-050 查询图书返回可借副本数（集成）
+
+- 目标：验证 FR-010
+- 步骤：为同一题名添加 3 个副本，借出其中 1 个，调用 `GET /api/catalog/titles?keyword=软件`
+- 预期结果：HTTP `200`，`totalItems=3`，`availableItems=2`
+
 ## 3. 测试数据准备
 
 - 统一使用 H2 内存库，`ddl-auto=create-drop`，测试类级 `@Transactional` 自动回滚。
@@ -282,15 +316,15 @@
 | 需求 | 测试用例 |
 |---|---|
 | FR-001 | TC-001 |
-| FR-002 / FR-003 | TC-002、TC-003、TC-004、TC-005 |
+| FR-002 / FR-003 | TC-002、TC-003、TC-004、TC-005、TC-047 |
 | FR-004 / FR-005 | 管理端集成测试（TC-005 同组） |
-| FR-006 / FR-007 | TC-006、TC-007、TC-008 |
+| FR-006 / FR-007 | TC-006、TC-007、TC-008、TC-048 |
 | FR-008 / FR-009 | TC-009、TC-010、TC-011 |
-| FR-010 | 目录查询集成测试 |
+| FR-010 | TC-050 |
 | FR-011 | TC-012 ~ TC-021 |
 | FR-012 | TC-022 ~ TC-024、TC-028 |
 | FR-013 | TC-038、TC-039、TC-040 |
-| FR-014 | TC-032 ~ TC-037 |
+| FR-014 | TC-032 ~ TC-037、TC-049 |
 | FR-015 | TC-025 ~ TC-029 |
 | FR-016 | TC-041、TC-042、TC-043 |
 | NFR-004 | TC-021 |

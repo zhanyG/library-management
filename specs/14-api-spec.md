@@ -153,8 +153,8 @@ POST /api/circulation/return
 ### 2.3 查询借阅信息
 
 ```text
-GET  /api/readers/{readerId}/loans          权限：本人 READER，或 LIBRARIAN / SYSTEM_ADMIN
-GET  /api/circulation/readers/{cardNo}/loans 权限：LIBRARIAN（按借阅证号代查）
+GET /api/readers/{readerId}/loans           权限：本人 READER，或 LIBRARIAN / SYSTEM_ADMIN
+GET /api/circulation/readers/{cardNo}/loans 权限：LIBRARIAN（按借阅证号代查）
 ```
 
 响应 `200`：
@@ -285,7 +285,7 @@ PUT /api/admin/fine-rules/{itemType}
 ### 4.7 维护图书管理员
 
 ```text
-POST   /api/admin/librarians           权限：SYSTEM_ADMIN   （FR-004）
+POST /api/admin/librarians             权限：SYSTEM_ADMIN   （FR-004）
 DELETE /api/admin/librarians/{staffNo} 权限：SYSTEM_ADMIN   （FR-005）
 ```
 
@@ -294,7 +294,7 @@ DELETE /api/admin/librarians/{staffNo} 权限：SYSTEM_ADMIN   （FR-005）
 ## 5. 罚款
 
 ```text
-GET  /api/fines?readerId={id}     权限：本人 READER / LIBRARIAN / SYSTEM_ADMIN
+GET /api/fines?readerId={id}      权限：本人 READER / LIBRARIAN / SYSTEM_ADMIN
 POST /api/fines/{fineId}/pay      权限：LIBRARIAN / SYSTEM_ADMIN
 ```
 

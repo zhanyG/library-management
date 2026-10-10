@@ -181,6 +181,32 @@
 | 异常 | `InvalidPolicyValueException`（负数/空值/上限 < 0）、`PermissionDeniedException` |
 | 事务边界 | 单条规则更新，事务包裹 |
 
+### 3.10 UC-005 取消预约（人工审查补充）
+
+| 设计项 | 内容 |
+|---|---|
+| 界面入口 | `ReservationController.cancel(reservationId, operator)` → `DELETE /api/reservations/{reservationId}` |
+| Application Service | `ReservationAppService.cancel(reservationId, operator)`：`@Transactional`；权限（预约所属读者本人或 `SYSTEM_ADMIN`） |
+| Domain Service | `ReservationService.cancel(reservationId, operatorId)`：校验预约存在与归属 → `Reservation.cancel()` 置 `CANCELLED` |
+| Entity / Aggregate | `Reservation`（WAITING → CANCELLED） |
+| Repository | `ReservationRepository`（`findById`、`save`） |
+| DTO | `ReservationResponse{reservationId, titleName, queuePosition, status}` |
+| 异常 | `PermissionDeniedException`(`PERMISSION_DENIED`)、`ReservationNotFoundException`(`RESERVATION_NOT_FOUND`) |
+| 事务边界 | 校验 + 状态更新同一事务；取消后后续排队序号保持不变（不重排，避免破坏先到先服务语义） |
+
+### 3.11 UC-206 删除图书标题信息（人工审查补充）
+
+| 设计项 | 内容 |
+|---|---|
+| 界面入口 | `CatalogController.deleteTitle(titleId, operator)` → `DELETE /api/admin/book-titles/{titleId}` |
+| Application Service | `CatalogAppService.deleteTitle(titleId, operator)`：`@Transactional`；权限（`SYSTEM_ADMIN`） |
+| Domain Service | 无（业务规则为“存在在借副本时禁止删除”，落点 `LibraryItemRepository.existsOnLoanByTitleId(titleId)`） |
+| Entity / Aggregate | `BookTitle`、`LibraryItem`（级联下架无在借副本） |
+| Repository | `BookTitleRepository`、`LibraryItemRepository` |
+| DTO | 无响应体，成功返回 `ApiResponse{code="OK"}` |
+| 异常 | `TitleNotFoundException`(`TITLE_NOT_FOUND`)、`TitleHasActiveLoansException`(`TITLE_HAS_ACTIVE_LOANS`)、`PermissionDeniedException` |
+| 事务边界 | 在借检查 + 级联删除同一事务 |
+
 ## 4. 领域层类职责清单
 
 | 类 | 职责 | 关键方法 |
@@ -230,3 +256,6 @@
 | 1 | 初稿未说明 Controller 命名与指导文档（LibrarianController / FineService）的对应关系 | 已在 §1 增加“命名对齐说明” |
 | 2 | 初稿未明确“尚未缴罚款是否阻止借书”的检查位置 | 已在 §3.1 校验链第 3 步明确，并列入 `FineRecordRepository` 依赖 |
 | 3 | 初稿未记录领域实体使用 JPA 注解的折中 | 已补充 §2.5 实现折中表 |
+| 4 | 初稿缺少 UC-005 取消预约与 UC-206 删除题名的详细设计 | 已补充 §3.10、§3.11 |
+| 5 | 接口路径书写存在多余空格，格式不统一 | 已统一为 `METHOD /path` 格式（`14-api-spec.md`） |
+| 6 | 校验脚本把 `opt` 块误判为 `alt` 块配对错误 | 已修正 `tools/validate_specs2.py` 的块计数逻辑 |
