@@ -1,0 +1,160 @@
+@startuml
+title 顺序图：办理还书（UC-102 / FR-012 / FR-015）
+
+autonumber
+
+actor "图书管理员\nLibrarian" as Librarian
+participant "CirculationController" as Ctrl
+participant "CirculationAppService" as App
+participant "CirculationService" as Domain
+participant "LibraryItemRepository" as ItemRepo
+participant "LoanRepository" as LoanRepo
+participant "FineRuleRepository" as RuleRepo
+participant "FineRecordRepository" as FineRepo
+participant "ReservationRepository" as ResvRepo
+participant "LibraryItem" as Item
+participant "Loan" as Loan
+participant "FineRule" as Rule
+participant "FineCalculator" as Calc
+participant "FineRecord" as Fine
+
+Librarian -> Ctrl : POST /api/circulation/return\n{barcode, operatorId, operatorRole}
+activate Ctrl
+Ctrl -> Ctrl : 参数校验（@Valid）
+Ctrl -> App : returnBook(command)
+activate App
+App -> App : assertRole(operatorRole == LIBRARIAN)
+
+alt 操作人不是图书管理员
+  App --> Ctrl : PermissionDeniedException(PERMISSION_DENIED)
+  Ctrl --> Librarian : 403 PERMISSION_DENIED
+else 操作人合法
+  App -> Domain : returnBook(barcode, librarianId, today)
+  activate Domain
+
+  Domain -> ItemRepo : findByBarcode(barcode)
+  activate ItemRepo
+  ItemRepo --> Domain : Optional<LibraryItem>
+  deactivate ItemRepo
+
+  alt 非本馆藏书（FR-012 验收标准 1）
+    Domain --> App : ItemNotFoundException(ITEM_NOT_FOUND)
+    App --> Ctrl : 业务异常
+    Ctrl --> Librarian : 400 ITEM_NOT_FOUND
+  else 馆藏存在
+    Domain -> Item : isOnLoan()
+    activate Item
+    Item --> Domain : boolean
+    deactivate Item
+
+    alt 副本未处于借出状态
+      Domain --> App : ItemNotOnLoanException(ITEM_NOT_ON_LOAN)
+      App --> Ctrl : 业务异常
+      Ctrl --> Librarian : 400 ITEM_NOT_ON_LOAN
+    else 副本在借
+      Domain -> LoanRepo : findActiveByItemId(itemId)
+      activate LoanRepo
+      LoanRepo --> Domain : Optional<Loan>
+      deactivate LoanRepo
+
+      alt 找不到未归还借阅记录
+        Domain --> App : ItemNotOnLoanException(ITEM_NOT_ON_LOAN)
+        App --> Ctrl : 业务异常
+        Ctrl --> Librarian : 400 ITEM_NOT_ON_LOAN
+      else 找到未还借阅记录
+        Domain -> Loan : markReturned(today)
+        activate Loan
+        deactivate Loan
+
+        Domain -> Loan : overdueDays(today)
+        activate Loan
+        Loan --> Domain : int overdueDays
+        deactivate Loan
+
+        alt 未超期或超期天数在免罚期内（BR-008）
+          Domain -> Item : markAvailable() 或 markReserved()
+          activate Item
+          deactivate Item
+          Domain -> ItemRepo : save(item)
+          activate ItemRepo
+          deactivate ItemRepo
+
+          Domain -> LoanRepo : save(loan)
+          activate LoanRepo
+          LoanRepo --> Domain : Loan(status = RETURNED)
+          deactivate LoanRepo
+
+          Domain --> App : ReturnResult(overdueDays = 0, fine = 0)
+        else 超期
+          Domain -> RuleRepo : findByItemType(item.itemType)
+          activate RuleRepo
+          RuleRepo --> Domain : FineRule
+          deactivate RuleRepo
+
+          Domain -> Calc : calculate(loan, rule, today)
+          activate Calc
+          Calc -> Rule : calcFine(overdueDays)
+          activate Rule
+          Rule --> Calc : Money（min(overdueDays × dailyFine, maxFine)）
+          deactivate Rule
+          Calc -> Fine : create(loanId, readerId, amount, UNPAID)
+          activate Fine
+          Fine --> Calc : FineRecord
+          deactivate Fine
+          Calc --> Domain : FineRecord
+          deactivate Calc
+
+          Domain -> FineRepo : save(fineRecord)
+          activate FineRepo
+          FineRepo --> Domain : FineRecord(fineId)
+          deactivate FineRepo
+
+          Domain -> LoanRepo : save(loan)
+          activate LoanRepo
+          LoanRepo --> Domain : Loan(status = RETURNED)
+          deactivate LoanRepo
+
+          Domain -> Item : markAvailable() 或 markReserved()
+          activate Item
+          deactivate Item
+          Domain -> ItemRepo : save(item)
+          activate ItemRepo
+          deactivate ItemRepo
+
+          Domain --> App : ReturnResult(overdueDays, fineAmount)
+        end
+
+        opt 该题名存在排队预约（BR-010：副本置 RESERVED，保留 7 天）
+          Domain -> ResvRepo : findHeadWaitingByTitleId(titleId)
+          activate ResvRepo
+          ResvRepo --> Domain : Optional<Reservation>
+          deactivate ResvRepo
+          Domain -> ResvRepo : markReservedAndNotify(reservationId, today + 7 days)
+          activate ResvRepo
+          deactivate ResvRepo
+        end
+      end
+    end
+  end
+  deactivate Domain
+
+  App -> App : 组装 ReturnBookResponse
+  App --> Ctrl : ReturnBookResponse
+  deactivate App
+  Ctrl --> Librarian : 200 OK {loanId, returnDate, overdueDays, fineAmount, fineStatus}
+  deactivate Ctrl
+end
+
+note over Calc
+  罚款计算（BR-008、BR-009）：
+  overdueDays = max(0, returnDate - dueDate - gracePeriodDays)
+  amount = min(overdueDays × dailyFine, maxFine)
+  免罚期内不生成 FineRecord
+end note
+
+note over App
+  事务边界：returnBook 方法级 @Transactional
+  登记归还 + 生成罚款 + 更新副本状态 + 处理队首预约 同事务提交
+end note
+
+@enduml
