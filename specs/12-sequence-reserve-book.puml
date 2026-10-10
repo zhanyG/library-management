@@ -1,0 +1,116 @@
+@startuml
+title 顺序图：预约图书（UC-004 / FR-014）
+
+autonumber
+
+actor "读者\nReader" as Reader
+participant "ReservationController" as Ctrl
+participant "ReservationAppService" as App
+participant "ReservationService" as Domain
+participant "ReaderRepository" as ReaderRepo
+participant "BookTitleRepository" as TitleRepo
+participant "ReservationRepository" as ResvRepo
+participant "BookTitle" as Title
+participant "Reservation" as Resv
+
+Reader -> Ctrl : POST /api/reservations\n{readerId, titleId, operatorId, operatorRole}
+activate Ctrl
+Ctrl -> Ctrl : 参数校验（@Valid）
+Ctrl -> App : reserve(command)
+activate App
+App -> App : assertSelf(readerId) 或 assertRole(LIBRARIAN / SYSTEM_ADMIN)
+
+alt 读者为非本人且非管理员（BR-015）
+  App --> Ctrl : PermissionDeniedException(PERMISSION_DENIED)
+  Ctrl --> Reader : 403 PERMISSION_DENIED
+else 权限合法
+  App -> Domain : reserve(readerId, titleId, now)
+  activate Domain
+
+  Domain -> ReaderRepo : findById(readerId)
+  activate ReaderRepo
+  ReaderRepo --> Domain : Optional<Reader>
+  deactivate ReaderRepo
+
+  alt 读者不存在
+    Domain --> App : ReaderNotFoundException(READER_NOT_FOUND)
+    App --> Ctrl : 业务异常
+    Ctrl --> Reader : 400 READER_NOT_FOUND
+  else 读者存在
+    Domain -> TitleRepo : findById(titleId)
+    activate TitleRepo
+    TitleRepo --> Domain : Optional<BookTitle>
+    deactivate TitleRepo
+
+    alt 图书标题不存在
+      Domain --> App : TitleNotFoundException(TITLE_NOT_FOUND)
+      App --> Ctrl : 业务异常
+      Ctrl --> Reader : 400 TITLE_NOT_FOUND
+    else 标题存在
+      Domain -> ResvRepo : existsByReaderIdAndTitleIdAndStatus(readerId, titleId, WAITING)
+      activate ResvRepo
+      ResvRepo --> Domain : boolean
+      deactivate ResvRepo
+
+      alt 重复预约同一题名（FR-014 验收标准 1）
+        Domain --> App : DuplicateReservationException(DUPLICATE_RESERVATION)
+        App --> Ctrl : 业务异常
+        Ctrl --> Reader : 400 DUPLICATE_RESERVATION
+      else 无重复预约
+        Domain -> ResvRepo : countByReaderIdAndStatus(readerId, WAITING)
+        activate ResvRepo
+        ResvRepo --> Domain : int waitingCount
+        deactivate ResvRepo
+
+        alt 有效预约数已达到上限 3 条（BR-012）
+          Domain --> App : ReservationLimitExceededException(RESERVATION_LIMIT_EXCEEDED)
+          App --> Ctrl : 业务异常
+          Ctrl --> Reader : 400 RESERVATION_LIMIT_EXCEEDED
+        else 未超过上限
+          Domain -> ResvRepo : countByTitleIdAndStatus(titleId, WAITING)
+          activate ResvRepo
+          ResvRepo --> Domain : int queueSize
+          deactivate ResvRepo
+
+          Domain -> Domain : queuePosition = queueSize + 1
+          Domain -> Resv : create(readerId, titleId, now, queuePosition)
+          activate Resv
+          Resv --> Domain : Reservation(status = WAITING)
+          deactivate Resv
+
+          Domain -> ResvRepo : save(reservation)
+          activate ResvRepo
+          ResvRepo --> Domain : Reservation(reservationId)
+          deactivate ResvRepo
+
+          Domain -> Title : availableItemCount()
+          activate Title
+          Title --> Domain : int availableCount
+          deactivate Title
+
+          Domain --> App : ReservationResult(reservation, availableCount)
+        end
+      end
+    end
+  end
+  deactivate Domain
+
+  App -> App : 组装 ReservationResponse
+  App --> Ctrl : ReservationResponse
+  deactivate App
+  Ctrl --> Reader : 201 Created {reservationId, titleName, queuePosition, createdAt, status}
+  deactivate Ctrl
+end
+
+note over Domain
+  排队规则（BR-010、BR-012）：
+  按 createdAt 排队，queuePosition = 同题名 WAITING 数量 + 1
+  到书保留 7 天，超时置 EXPIRED 并顺延下一位
+end note
+
+note over App
+  事务边界：reserve 方法级 @Transactional
+  校验 + 序号分配 + 保存 同事务，避免并发下序号冲突
+end note
+
+@enduml
