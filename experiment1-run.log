@@ -384,3 +384,71 @@ f67ff04 init AI-era library management experiment
 
 [2026-10-10 11:03:23] STEP 05-0 | commit execution log and tool scripts
 PS> git add experiment1-run.log tools
+(no output)
+[exit=0]
+
+[2026-10-10 11:03:23] STEP 05-0-commit | commit: chore: record experiment 1 execution log and scripts
+PS> git commit -m "chore: record experiment 1 execution log and scripts"
+[master 0fb2abb] chore: record experiment 1 execution log and scripts
+ 1 file changed, 386 insertions(+)
+ create mode 100644 experiment1-run.log
+[exit=0]
+
+[2026-10-10 11:03:23] STEP 05-1 | git log (all step commits)
+PS> git log --oneline --decorate
+0fb2abb (HEAD -> master) chore: record experiment 1 execution log and scripts
+f8ef8dd add ai usage log
+a4da9db generate risk analysis and review checklist
+aaa18f3 generate database design
+65a9717 generate package diagram
+897b91b generate architecture spec
+2426e65 generate domain class diagram
+fcab2d6 generate domain model
+0e99a58 generate use case diagram
+4eca9d4 generate use case texts
+7a63c9b generate requirements spec
+0e7e03b add development constitution
+1d8fe9e answer clarifying questions
+7d2bb50 add project brief
+f67ff04 init AI-era library management experiment
+[exit=0]
+
+[2026-10-10 11:03:23] STEP 05-2 | list tracked deliverables
+PS> git ls-files
+experiment1-run.log
+specs/00-project-brief.md
+specs/01-clarifying-questions.md
+specs/02-requirements.md
+specs/03-use-cases.md
+specs/04-use-case-model.puml
+specs/05-domain-model.md
+specs/06-domain-class-diagram.puml
+specs/07-architecture.md
+specs/08-package-diagram.puml
+specs/09-design-model.md
+specs/10-sequence-borrow-book.puml
+specs/11-sequence-return-book.puml
+specs/12-sequence-reserve-book.puml
+specs/13-database-design.md
+specs/14-api-spec.md
+specs/15-test-plan.md
+specs/16-tasks.md
+specs/17-risk-analysis.md
+specs/18-review-checklist.md
+specs/19-ai-usage-log.md
+specs/constitution.md
+tools/run-experiment1.ps1
+tools/validate_specs.py
+[exit=0]
+
+[2026-10-10 11:03:23] STEP 05-3 | count commits
+PS> git rev-list --count HEAD
+15
+[exit=0]
+
+================================================================
+ Experiment 1 finished, log file: C:\Users\Administrator\Desktop\体系结构实验\library-management-ai\experiment1-run.log
+ Finished at : 2026-10-10 11:03:23
+================================================================
+[2026-10-10 11:03:23] STEP 05-4 | commit final execution log
+PS> git add experiment1-run.log
