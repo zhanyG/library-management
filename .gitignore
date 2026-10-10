@@ -1,0 +1,16 @@
+# Maven 构建产物
+target/
+!.mvn/wrapper/maven-wrapper.jar
+
+# IDE
+.idea/
+*.iml
+*.ipr
+*.iws
+.vscode/
+
+# 系统文件
+.DS_Store
+Thumbs.db
+
+# 注意：experiment1-run.log / experiment2-run.log 是实验过程记录，需纳入版本管理，不在此忽略
