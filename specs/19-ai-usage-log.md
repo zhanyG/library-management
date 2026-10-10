@@ -39,6 +39,96 @@
 4. 人工审查清单是防止“AI 直接交付”的关键闸门，必须逐项勾选后再冻结 baseline。
 5. Windows 环境下用脚本搬运 UTF-8 文档必须做字节级处理，避免 ANSI/UTF-8 转换导致乱码。
 
-## 4. 实验二预留
+---
 
-实验二将基于本次冻结的 baseline 生成：设计模型 `09-design-model.md`、顺序图 `10/11/12-sequence-*.puml`、API 规范 `14-api-spec.md`、测试计划 `15-test-plan.md`、任务拆解 `16-tasks.md`，并实现代码与自动化测试。每次使用 Agent 均需追加到本文件。
+# 实验二 Agent 使用记录
+
+> 实验二完整操作流水由 `tools/run-experiment2.ps1` 自动生成于项目根目录的 `experiment2-run.log`。
+> 本节按“每次使用”为单位登记：使用的 Agent、阶段、任务、Prompt 摘要、产物、测试结果、人工审查结论与 Git 提交。
+
+## 第 14 次使用
+
+- 使用工具：CodeBuddy（Agent）
+- 使用阶段：详细设计
+- 使用任务：生成详细设计模型 `09-design-model.md`
+- 输入 Prompt 摘要：依据 requirements / use-cases / domain-model / architecture / database-design，以用例为单元列出 Controller、Application Service、Domain Service、Entity、Repository、DTO、异常与事务边界，并说明设计模式落点
+- Agent 修改文件：`specs/09-design-model.md`
+- 测试结果：不适用（文档）
+- 人工审查结果：初稿缺少 Controller 命名与指导文档（LibrarianController / FineService）的对应说明、未记录 JPA 注解折中；后续审查轮次已补充 §1 命名对齐、§2.5 实现折中、§3.10 取消预约、§3.11 删除题名
+- Git 提交：`generate detailed design model` → `revise detailed design specs after review`
+
+## 第 15 次使用
+
+- 使用工具：CodeBuddy（Agent）
+- 使用阶段：UML 建模（顺序图）
+- 使用任务：生成办理借书 / 办理还书 / 预约图书三张顺序图
+- 输入 Prompt 摘要：按用例文本与详细设计绘制 PlantUML 顺序图，覆盖正常流程与异常分支（借阅证无效、超额度、有超期未还、图书不可借、非本馆藏书、未找到借阅记录、重复预约、超过预约上限）
+- Agent 修改文件：`specs/10-sequence-borrow-book.puml`、`specs/11-sequence-return-book.puml`、`specs/12-sequence-reserve-book.puml`
+- 测试结果：`tools/validate_specs2.py` 校验通过（alt/else/opt 与 end 配对、关键对象齐全）
+- 人工审查结果：发现校验脚本把 `opt` 块误判为不平衡，已修正校验逻辑；顺序图内容本身与用例文本一致
+- Git 提交：`generate borrow book sequence diagram`、`generate return book sequence diagram`、`generate reserve book sequence diagram`
+
+## 第 16 次使用
+
+- 使用工具：CodeBuddy（Agent）
+- 使用阶段：接口设计与测试设计
+- 使用任务：生成 `14-api-spec.md`、`15-test-plan.md`、`16-tasks.md`
+- 输入 Prompt 摘要：按 REST 格式定义接口（路径、请求、响应、权限、成功/失败场景），生成 50 条测试用例并给出需求覆盖矩阵，按“一次可完成”粒度拆解 14 个实现任务
+- Agent 修改文件：`specs/14-api-spec.md`、`specs/15-test-plan.md`、`specs/16-tasks.md`
+- 测试结果：`python tools/validate_specs2.py` 通过（50 个 TC、14 个 TASK、关键要素齐全）
+- 人工审查结果：发现接口路径书写空格不统一、测试计划缺少注销借阅证/删除题名/取消预约/目录查询用例，已修订并补充 TC-047 ~ TC-050
+- Git 提交：`generate api spec`、`generate test plan`、`generate implementation tasks`
+
+## 第 17 次使用
+
+- 使用工具：CodeBuddy（Agent）
+- 使用阶段：编码实现（TASK-001 ~ TASK-003）
+- 使用任务：初始化 Spring Boot 项目结构、实现领域实体与 Repository 端口/适配器
+- 输入 Prompt 摘要：按 `16-tasks.md` 逐任务实现，先输出计划、只改允许文件、实现后运行测试；领域实体按 `05-domain-model.md` 与 `13-database-design.md` 映射
+- Agent 修改文件：`pom.xml`、`src/main/resources/application.yml`、`src/main/java/.../domain/model/**`、`domain/repository/**`、`infrastructure/persistence/**`、`exception/**`、对应测试
+- 测试结果：`mvn test` 通过（TASK-001 上下文测试、TASK-002 单元测试、TASK-003 适配器集成测试）
+- 人工审查结果：
+  1. TASK-002 初版 `MoneyTest.rejectDifferentCurrency` 无法通过公开 API 触发（系统为单一币种），属测试设计缺陷，改为验证金额值相等语义；
+  2. `TestDataFactory.addItem` 通过级联保存导致返回实体 id 未回填，已改为显式保存副本；
+  3. 生成代码存在导入缺失与 `void` 方法 `return` 语句问题，已修复。
+- Git 提交：`complete TASK-001 initialize project structure`、`complete domain entities`、`fix Money value object test case`、`complete repository ports and adapters`
+
+## 第 18 次使用
+
+- 使用工具：CodeBuddy（Agent）
+- 使用阶段：编码实现（TASK-004 ~ TASK-008）
+- 使用任务：借阅规则策略、罚款规则策略、读者注册与借阅查询、借阅证管理、目录管理
+- 输入 Prompt 摘要：按用例与规则取值实现 Strategy（BorrowPolicy / FineRule）、动态权限校验（PermissionChecker）、编号生成（CARD/ITEM + 年份 + 6 位序号）与目录维护
+- Agent 修改文件：`domain/model/circulation/BorrowPolicy.java`、`domain/model/fine/FineRule.java`、`application/{ReaderAppService,CardAppService,CatalogAppService,PermissionChecker}.java`、`presentation/controller/{ReaderController,CardController,CatalogController}.java`、规则初始化器与测试
+- 测试结果：`mvn test` 通过
+- 人工审查结果：规则取值与 `01-clarifying-questions.md` 一致；权限失败场景均有测试覆盖；确认 Controller 未包含业务规则
+- Git 提交：`complete borrow policy strategy`、`complete fine rule strategy`、`complete reader registration and loan query`、`complete borrow card management tests`、`complete catalog management`
+
+## 第 19 次使用
+
+- 使用工具：CodeBuddy（Agent）
+- 使用阶段：编码实现（TASK-009 ~ TASK-013）
+- 使用任务：办理借书、办理还书、预约与取消预约、管理员维护、罚款查询与缴纳
+- 输入 Prompt 摘要：按顺序图与详细设计实现校验链与状态变更，事务边界放应用服务层，超期罚款调用 FineCalculator，预约按创建时间排队
+- Agent 修改文件：`domain/service/{CirculationService,ReservationService,FineCalculator,ReturnResult}.java`、`application/{CirculationAppService,ReservationAppService,AdminAppService,FineAppService,LoanViewAssembler}.java`、`presentation/controller/{CirculationController,ReservationController,AdminController,FineController}.java`、`domain/repository/ReservationRepository.java` 与适配器、对应集成测试
+- 测试结果：`mvn test` 通过（含借书 11 例、还书 8 例、预约 8 例、管理员 7 例、罚款 5 例、REST 端到端 16 例）
+- 人工审查结果：发现并修复两个真实缺陷——(1) `CirculationService.returnBook` 先置 `RETURNED` 再计算超期天数，导致超期天数恒为 0、罚款恒为 0（已调整顺序）；(2) 规则维护 DTO 的 `@Positive` 校验先于领域校验，导致非法值返回 400 而非规格约定的 422 `INVALID_POLICY_VALUE`（已把数值合法性统一交由领域实体校验）
+- Git 提交：`complete borrow and return use cases`、`complete reservation use case`、`complete admin management`、`complete fine query and payment`
+
+## 第 20 次使用
+
+- 使用工具：CodeBuddy（Agent）
+- 使用阶段：测试完善与交付文档（TASK-014）
+- 使用任务：REST 端到端测试、README、AI 使用记录
+- 输入 Prompt 摘要：对照 `15-test-plan.md` 覆盖矩阵补充端到端测试（状态码、错误码、权限矩阵），生成 README 并追加实验二 AI 使用记录
+- Agent 修改文件：`src/test/java/.../presentation/ApiEndToEndTest.java`、`README.md`、`specs/19-ai-usage-log.md`
+- 测试结果：`mvn test` 全部通过（96 个测试，0 失败）
+- 人工审查结果：确认 README 描述与实现一致、未编造未实现功能；确认 baseline 后仅追加记录类文件（`19-ai-usage-log.md`），未修改已冻结的设计规格
+- Git 提交：`complete test coverage and README`、`chore: finalize experiment 2 execution log`
+
+## 实验二复盘
+
+1. 顺序图与详细设计先行，使代码实现阶段几乎没有结构性返工，返工集中在“实现细节缺陷”（如超期天数计算顺序）与“错误码一致性”。
+2. 集成测试是发现真实缺陷的主要手段：3 个缺陷（超期天数为 0、DTO 校验覆盖领域错误码、测试数据 id 未回填）全部由测试暴露而非代码评审发现。
+3. Agent 生成的批量代码需要“编译—测试—修正”闭环，导入与模板化代码尤其容易出问题。
+4. 事务边界放在应用服务层后，失败场景的数据一致性可以直接通过“断言未变”验证，符合 NFR-004。
