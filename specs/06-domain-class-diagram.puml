@@ -1,0 +1,296 @@
+﻿@startuml
+title 图书管理系统领域类图（Domain Class Diagram）
+
+skinparam classAttributeIconSize 0
+skinparam linetype ortho
+
+'================ 枚举 ================
+enum ItemStatus {
+  AVAILABLE
+  ON_LOAN
+  RESERVED
+  WITHDRAWN
+  LOST
+  UNDER_REPAIR
+}
+
+enum LoanStatus {
+  BORROWED
+  OVERDUE
+  RETURNED
+}
+
+enum CardStatus {
+  VALID
+  REVOKED
+  LOST
+}
+
+enum ReservationStatus {
+  WAITING
+  FULFILLED
+  CANCELLED
+  EXPIRED
+}
+
+enum FineStatus {
+  UNPAID
+  PAID
+}
+
+enum ReaderType {
+  JUNIOR_COLLEGE
+  UNDERGRADUATE
+  POSTGRADUATE
+  DOCTORAL
+  TEACHER
+}
+
+'================ 值对象 ================
+class Money {
+  - amount : BigDecimal
+  - currency : String
+  + add(other : Money) : Money
+  + times(n : int) : Money
+  + isZero() : boolean
+}
+
+class DateRange {
+  - startDate : LocalDate
+  - endDate : LocalDate
+  + daysBetween(other : LocalDate) : int
+}
+
+'================ 读者与借阅证 ================
+abstract class Reader {
+  - readerId : Long
+  - name : String
+  - idCardNo : String
+  - phone : String
+  - department : String
+  - readerType : ReaderType
+  - status : String
+  + isActive() : boolean
+  + currentLoanCount() : int
+  + getBorrowPolicy() : BorrowPolicy
+}
+
+class StudentReader {
+  - studentNo : String
+  - grade : String
+  - major : String
+}
+
+class TeacherReader {
+  - employeeNo : String
+  - title : String
+  - faculty : String
+}
+
+class BorrowCard {
+  - cardId : Long
+  - cardNo : String
+  - ownerName : String
+  - department : String
+  - issueDate : LocalDate
+  - status : CardStatus
+  + isValid() : boolean
+  + revoke() : void
+  + markLost() : void
+}
+
+'================ 管理员 ================
+class Librarian {
+  - librarianId : Long
+  - staffNo : String
+  - name : String
+  - status : String
+  + canOperateCirculation() : boolean
+}
+
+class SystemAdmin {
+  - adminId : Long
+  - username : String
+  - name : String
+  - status : String
+  + canMaintainCatalog() : boolean
+  + canMaintainPolicy() : boolean
+}
+
+'================ 馆藏 ================
+class BookTitle {
+  - titleId : Long
+  - name : String
+  - author : String
+  - isbn : String
+  - publisher : String
+  - publishedYear : int
+  - itemType : String
+  + addItem(item : LibraryItem) : void
+  + availableItemCount() : int
+  + isLoanable() : boolean
+}
+
+abstract class LibraryItem {
+  - itemId : Long
+  - barcode : String
+  - location : String
+  - status : ItemStatus
+  - loanable : boolean
+  + isAvailable() : boolean
+  + markOnLoan() : void
+  + markAvailable() : void
+  + markReserved() : void
+  + withdraw() : void
+}
+
+class Book {
+  - language : String
+  - pages : int
+  - edition : String
+}
+
+class Magazine {
+  - language : String
+  - issue : String
+  - periodicalNo : String
+}
+
+class Thesis {
+  - degree : String
+  - supervisor : String
+  - department : String
+}
+
+'================ 借阅 / 预约 / 罚款 ================
+class Loan {
+  - loanId : Long
+  - borrowDate : LocalDate
+  - dueDate : LocalDate
+  - returnDate : LocalDate
+  - status : LoanStatus
+  + isOverdue(now : LocalDate) : boolean
+  + overdueDays(now : LocalDate) : int
+  + return(now : LocalDate) : void
+}
+
+class Reservation {
+  - reservationId : Long
+  - createdAt : LocalDateTime
+  - queuePosition : int
+  - expireAt : LocalDateTime
+  - status : ReservationStatus
+  + isHeadOfQueue() : boolean
+  + cancel() : void
+  + expire(now : LocalDateTime) : void
+}
+
+class FineRecord {
+  - fineId : Long
+  - amount : Money
+  - status : FineStatus
+  - createdAt : LocalDateTime
+  - paidAt : LocalDateTime
+  + pay() : void
+  + isUnpaid() : boolean
+}
+
+'================ 规则策略 ================
+class BorrowPolicy {
+  - policyId : Long
+  - readerType : ReaderType
+  - maxLoanCount : int
+  - loanPeriodDays : int
+  + exceedQuota(count : int) : boolean
+  + calcDueDate(from : LocalDate) : LocalDate
+}
+
+class FineRule {
+  - ruleId : Long
+  - itemType : String
+  - gracePeriodDays : int
+  - dailyFine : Money
+  - maxFine : Money
+  + calcFine(overdueDays : int) : Money
+}
+
+'================ 领域服务 ================
+class CirculationService {
+  + borrowBook(cardNo, barcode, librarianId) : Loan
+  + returnBook(barcode, librarianId) : Loan
+  - checkCard(cardNo) : BorrowCard
+  - checkQuota(reader) : void
+  - checkOverdue(reader) : void
+  - checkUnpaidFine(reader) : void
+}
+
+class ReservationService {
+  + reserve(readerId, titleId) : Reservation
+  + cancel(reservationId, readerId) : void
+  + nextWaiting(titleId) : Reservation
+  + expireOverdue(now) : void
+}
+
+class FineCalculator {
+  + calculate(loan : Loan, rule : FineRule, now) : FineRecord
+}
+
+'================ 继承关系 ================
+Reader <|-- StudentReader
+Reader <|-- TeacherReader
+LibraryItem <|-- Book
+LibraryItem <|-- Magazine
+LibraryItem <|-- Thesis
+
+'================ 关联关系 ================
+Reader "1" -- "0..1" BorrowCard : 持有 >
+BorrowCard "1" -- "0..*" Loan : 用于借书 >
+Reader "1" -- "0..*" Loan : 借阅记录 >
+Reader "1" -- "0..*" Reservation : 发起预约 >
+Reader "1" -- "0..*" FineRecord : 产生罚款 >
+
+BookTitle "1" *-- "0..*" LibraryItem : 组合副本 >
+LibraryItem "1" -- "0..*" Loan : 被借阅 >
+BookTitle "1" -- "0..*" Reservation : 被预约 >
+
+Librarian "1" -- "0..*" Loan : 办理 >
+Loan "1" -- "0..1" FineRecord : 超期生成 >
+
+LibraryItem --> ItemStatus : 使用
+Loan --> LoanStatus : 使用
+BorrowCard --> CardStatus : 使用
+Reservation --> ReservationStatus : 使用
+FineRecord --> FineStatus : 使用
+Reader --> ReaderType : 使用
+
+Loan --> DateRange : 借出区间
+FineRecord --> Money : 金额
+FineRule --> Money : 每日金额/上限
+
+'================ 策略与服务依赖 ================
+Reader ..> BorrowPolicy : 适用
+LibraryItem ..> FineRule : 适用
+CirculationService ..> BorrowPolicy : 校验额度
+CirculationService ..> Loan : 创建
+CirculationService ..> ReservationService : 校验预约占用
+FineCalculator ..> FineRule : 计算罚款
+CirculationService ..> FineCalculator : 还书时调用
+SystemAdmin ..> BorrowPolicy : 维护
+SystemAdmin ..> FineRule : 维护
+SystemAdmin ..> BookTitle : 维护
+SystemAdmin ..> BorrowCard : 办理
+ReservationService ..> Reservation : 排队管理
+
+note right of CirculationService
+  借书校验顺序：
+  借阅证有效 → 无未缴罚款
+  → 无超期未还 → 未超额度
+  → 副本可借且未被他人预约
+end note
+
+note bottom of BorrowCard
+  借阅证含：读者姓名、
+  院系或单位、借阅证号
+end note
+
+@enduml
